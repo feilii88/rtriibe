@@ -8,6 +8,7 @@ import asyncio
 import requests
 from typing import List
 from vapi_python import Vapi
+from app.util.openai_client import OpenAIClient
 
 class InterviewBot:
     def __init__(self):
@@ -18,6 +19,7 @@ class InterviewBot:
         self.total_questions = len(self.questions['questions'])
         # Initialize VAPI
         self.vapi = Vapi(api_key=constants.VAPI_KEY)
+        self.openai_client = OpenAIClient()
 
     def _load_questions(self) -> Dict:
         """Load interview questions from JSON file"""
@@ -66,6 +68,13 @@ class InterviewBot:
                     await candidate.save()
                     return {"status": "success", "method": "sms"}
 
+            # try_sms_status = await self.try_sms(candidate)
+            # print("SMS status", str(try_sms_status))
+            # if try_sms_status.get("success"):
+            #     candidate.communication_method = "sms"
+            #     await candidate.save()
+            #     return {"status": "success", "method": "sms"}
+
             return {"status": "failed", "message": "All communication methods failed"}
 
         except Exception as e:
@@ -109,11 +118,14 @@ class InterviewBot:
                 "Authorization": constants.VAPI_KEY,
                 "Content-Type": "application/json"
             }
-            
+
+            # Clean the phone number to only keep digits and leading plus sign
+            candidatePhone = ''.join(char for char in candidate.phone if char.isdigit() or (char == '+' and candidate.phone.index(char) == 0))
+
             payload = {
                 "phoneNumberId": constants.VAPI_PHONE_NUMBER_ID,
                 "customer": {
-                    "number": candidate.phone,
+                    "number": candidatePhone,
                     "name": candidate.name
                 },
                 "assistant": {
@@ -130,26 +142,22 @@ class InterviewBot:
                             {
                                 "role": "system",
                                 "content": """You are a qualification interviewer.
-First ask: "Are you available for a quick interview? The process will take about twenty minutes."
+First ask: "Hello, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
 If user says no or is not available, say "Thank you for your time. Goodbye." and end the call.
 
 Ask these questions in order:
-1. Where are you currently based? (City, Town, Postal Code please)
-2. Are you eligible to work in the UK?
-3. Do you have a current DBS certificate registered on the Update Service?
-4. How many days per week are you available to work?
-   • If less than 3 days, say "Thank you for your time, but we require minimum 3 days availability. Goodbye." and end the call
-5. Are you available to start immediately?
-   • If No, ask "What is your earliest start date?"
-6. Do you have experience working with children in schools or childcare?
-7. Have you previously worked in a supply role?
+1. Are you eligible to work in the UK?
+   • If No, then say "Thank you for your time, but we require UK work eligibility. Goodbye." and end the call
+2. How many days per week are you available to work?
+   • If less than 3 weekdays, say "Thank you for your time, but we require minimum 3 days availability. Goodbye." and end the call
+3. Where do you currently live? (City or Town please)
+   • If not in the UK, say "Thank you for your time, but we only accept candidates based in the UK. Goodbye." and end the call
+4. Have you previously worked in a supply role?
    • If Yes, ask "Which agency did you work with?"
-8. Do you have access to your own transport?
-9. How far are you willing to travel for work?
-10. Do you have any restrictions on availability due to other commitments?
-11. What motivates you to work in schools?
+5. Do you have any restrictions on your availability due to childcare, study, or other commitments?
+6. Do you have a current DBS certificate that is registered on the Update Service?
 
-After all questions are answered, say "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye." and end the call.
+After all questions are answered, say "Thank you for that. That's all for now, your should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day." and end the call.
 
 Be professional but friendly. Listen carefully to answers and ask for clarification if needed."""
                             }
@@ -159,9 +167,9 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
                         "maxTokens": 250,
                     },
                     "recordingEnabled": True,
-                    "firstMessage": f"Hello {candidate.name}, I'm calling about your qualification interview. Are you available to talk for about twenty minutes?",
+                    "firstMessage": f"Hello {candidate.name}, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?",
                     "voicemailMessage": "Sorry we missed you. Please register again when you're available for the interview.",
-                    "endCallMessage": "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye.",
+                    "endCallMessage": "Thank you for that. That's all for now, your should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day.",
                     "transcriber": {
                         "model": "general",
                         "language": "en",
@@ -180,7 +188,7 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
                     "endCallPhrases": [
                         "Goodbye.",
                         "Thank you for your time. Goodbye.",
-                        "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye."
+                        "In the future please get in touch with us again. Many thanks for your interest in rTriibe. Goodbye."
                     ],
                 }
             }
@@ -252,25 +260,27 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
             return {"success": False, "error": str(e)}
 
     async def try_sms(self, candidate: CandidateModel) -> Dict:
-        """Attempt SMS as last resort"""
+        """Attempt SMS interview"""
         try:
+            # Send initial message
+            welcome_msg = f"Hi {candidate.name}, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
+            
             message = self.twilio_client.messages.create(
-                body=f"Hi {candidate.name}, please reply START to begin your qualification interview.",
-                to=candidate.phone,
-                from_=self.phone_number
+                from_=self.phone_number,
+                body=welcome_msg,
+                to=candidate.phone
             )
             
-            # Wait briefly for message status
-            await asyncio.sleep(2)
-            message = self.twilio_client.messages(message.sid).fetch()
-            
-            if message.status in ['sent', 'delivered', 'queued']:
-                await self.send_welcome_message(candidate)  # Send initial instructions
+            if message.sid:
+                candidate.communication_method = "sms"
+                candidate.current_question = -1  # Special state for waiting for initial confirmation
+                await candidate.save()
                 return {"success": True}
-            return {"success": False, "error": message.status}
+            
+            return {"success": False, "error": "Failed to send SMS"}
             
         except Exception as e:
-            print("SMS error", str(e))
+            print(f"SMS error: {str(e)}")
             return {"success": False, "error": str(e)}
 
     async def evaluate_availability_answer(self, answer: str) -> bool:
@@ -474,23 +484,72 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
         )
 
     async def handle_response(self, from_number: str, message: str) -> str:
-        """Handle incoming SMS messages"""
-        # Normalize phone number by removing all non-digit and plus characters
-        from_number = ''.join(char for char in from_number.strip() if char.isdigit() or char == '+')
-        
-        candidate = await CandidateCRUD.get_candidate_by_phone(from_number)
-        print("Candidate", candidate)
-        if not candidate:
-            return "Sorry, I couldn't find your registration. Please register first."
+        """Handle incoming SMS responses"""
+        try:
+            # Get candidate
+            candidate = await CandidateCRUD.get_candidate_by_phone(from_number)
+            if not candidate:
+                return "Sorry, we couldn't find your registration. Please register first."
 
-        if message.upper() == 'START':
-            await self.start_interview(candidate)
-            # Get the first question text to include in response
-            first_question = self.get_question(0)
-            return f"Interview started. First question: {first_question['text']}"
+            # Handle initial confirmation
+            if candidate.current_question == -1:
+                if any(word.lower() in message.lower() for word in ['yes', 'yeah', 'sure', 'ok', 'okay', 'yep', 'yup', 'y', 'ye']):
+                    candidate.current_question = 0
+                    await candidate.save()
+                    # Send first question
+                    return self.questions['questions'][0]['text']
+                else:
+                    return "Thank you for your time. Goodbye."
 
-        # Process answer and send next question
-        return await self.process_answer(candidate, message)
+            # Get current question
+            if candidate.current_question >= len(self.questions['questions']):
+                return "Interview already completed. Thank you!"
+
+            current_question = self.questions['questions'][candidate.current_question]
+
+            # Validate answer using OpenAI
+            is_valid, reason, normalized_answer = self.openai_client.validate_answer(current_question, message)
+            
+            if not is_valid:
+                return f"I didn't quite understand that. {reason}"
+
+            # Check if interview should end based on answer
+            should_end, end_message = self.openai_client.should_end_interview(
+                current_question['id'], 
+                normalized_answer
+            )
+            
+            if should_end:
+                candidate.status = "disqualified"
+                candidate.disqualification_reason = end_message
+                await candidate.save()
+                return end_message
+
+            # Store the answer
+            await candidate.store_answer(current_question['id'], normalized_answer)
+
+            # Handle follow-up question for supply role
+            if current_question['id'] == 4 and message.lower() == 'yes':
+                return "Which agency did you work with?"
+
+            # Move to next question
+            candidate.current_question += 1
+            await candidate.save()
+
+            # Check if interview is complete
+            if candidate.current_question >= len(self.questions['questions']):
+                candidate.status = "pending"
+                await candidate.save()
+                return ("Thank you for that. That's all for now, your should receive a link for your application form "
+                       "if you can complete this as soon as possible we will get you cleared and out working. "
+                       "Many thanks and have a good day.")
+
+            # Send next question
+            return self.questions['questions'][candidate.current_question]['text']
+
+        except Exception as e:
+            print(f"Error handling SMS response: {str(e)}")
+            return "Sorry, there was an error processing your response. Please try again."
 
     def get_question(self, question_number: int, previous_answer: Optional[str] = None) -> Dict[str, Any]:
         """Get question by number, considering follow-ups"""

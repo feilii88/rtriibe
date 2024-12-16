@@ -2,50 +2,23 @@
   "questions": [
     {
       "id": 1,
-      "text": "Where are you currently based? (City and Town and Postal Code)",
-      "type": "text",
-      "required": true
+      "text": "Are you eligible to work in the UK? (Yes/No)",
+      "type": "boolean",
+      "options": ["Yes", "No"]
     },
     {
       "id": 2,
-      "text": "Are you eligible to work in the UK?",
-      "type": "boolean",
-      "options": ["Yes", "No"],
-      "required": true
-    },
-    {
-      "id": 3,
-      "text": "Do you have a current DBS certificate that is registered on the Update Service?",
-      "type": "boolean",
-      "options": ["Yes", "No"],
-      "required": true
-    },
-    {
-      "id": "availability",
       "text": "How many days per week are you available to work?",
       "type": "text"
     },
     {
-      "id": 5,
-      "text": "Are you available to start immediately?",
-      "type": "boolean",
-      "options": ["Yes", "No"],
-      "follow_up": {
-        "No": {
-          "text": "What is your earliest start date?",
-          "type": "date"
-        }
-      }
+      "id": 3,
+      "text": "Where do you currently live? (City/Town)",
+      "type": "text"
     },
     {
-      "id": 6,
-      "text": "Do you have experience working with children in a school or childcare setting?",
-      "type": "text",
-      "required": true
-    },
-    {
-      "id": 7,
-      "text": "Have you previously worked in a supply role?",
+      "id": 4,
+      "text": "Have you previously worked in a supply role? (Yes/No)",
       "type": "boolean",
       "options": ["Yes", "No"],
       "follow_up": {
@@ -56,27 +29,16 @@
       }
     },
     {
-      "id": 8,
-      "text": "Do you have access to your own transport?",
+      "id": 5,
+      "text": "Do you have any restrictions on your availability due to childcare, study, or other commitments? (Yes/No)",
       "type": "boolean",
       "options": ["Yes", "No"]
     },
     {
-      "id": 9,
-      "text": "How far are you willing to travel for work? (in miles)",
-      "type": "number",
-      "required": true
-    },
-    {
-      "id": 10,
-      "text": "Do you have any restrictions on your availability due to childcare, study, or other commitments?",
-      "type": "text"
-    },
-    {
-      "id": 11,
-      "text": "What motivates you to work in schools?",
-      "type": "text",
-      "required": true
+      "id": 6,
+      "text": "Do you have a current DBS certificate that is registered on the Update Service? (Yes/No)",
+      "type": "boolean",
+      "options": ["Yes", "No"]
     }
   ]
 }

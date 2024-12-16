@@ -219,14 +219,23 @@ async def sms_webhook(request: Request):
     data = await request.form()
     message = data.get('Body')
     from_number = data.get('From').strip()
+
+    print("Message:", message)
+    print("From number:", from_number)
     
     if not message or not from_number:
         raise HTTPException(status_code=400, detail="Invalid webhook data")
 
     # Get bot response
+    print("Getting bot response")
     bot_response = await interview_bot.handle_response(from_number, message)
+    print("Bot response:", bot_response)
     
-    return {"status": "success", "message": bot_response}
+    resp = MessagingResponse()
+    resp.message(bot_response)
+    
+    # Return TwiML response
+    return Response(content=str(resp), media_type="application/xml")
 
 @router.get("/status/{candidate_id}", response_model=CandidateQualification)
 async def get_qualification_status(candidate_id: int):
@@ -286,7 +295,7 @@ async def vapi_webhook(request: Request):
         # Handle end-of-call report
         elif message_data.get('type') == 'end-of-call-report':
             # Get transcript directly from message_data
-            transcript = message_data.get('transcript', '')
+            transcript = message_data.get('artifact', {}).get('messages', [])
             if transcript:
                 try:
                     # Parse current answers
@@ -296,10 +305,7 @@ async def vapi_webhook(request: Request):
                         current_answers = []
                     
                     # Add full transcript
-                    current_answers.append({
-                        "full_transcript": transcript,
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
+                    current_answers.extend(transcript)
                     
                     # Update candidate's answers
                     candidate.answers = json.dumps(current_answers)

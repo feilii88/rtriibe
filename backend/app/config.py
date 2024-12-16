@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     RELEVANCE_AI_AUTH_TOKEN: str
     RELEVANCE_AI_REGION: str
 
+    OPENAI_API_KEY: str
+
 
 @lru_cache
 def get_settings():
