@@ -6,6 +6,8 @@ from app.schemas.candidate import CandidateCreate, CandidateResponse, CandidateQ
 from twilio.twiml.voice_response import VoiceResponse, Gather
 from twilio.twiml.messaging_response import MessagingResponse
 from app.util.voice_generator import VoiceGenerator
+import json
+from datetime import datetime
 
 router = APIRouter(prefix="/qualification", tags=["qualification"])
 interview_bot = InterviewBot()
@@ -239,3 +241,76 @@ async def get_qualification_status(candidate_id: int):
         "total_questions": interview_bot.total_questions,
         "qualified": candidate.status == "qualified"
     } 
+
+@router.post("/webhook/vapi")
+async def vapi_webhook(request: Request):
+    """Handle VAPI webhooks for call updates"""
+    data = await request.json()
+    print("VAPI Webhook Data:", data)
+    try:
+        # Get the customer phone number from the message data structure
+        message_data = data.get('message', {})
+        
+        # Get customer info from the call object if it exists
+        call_data = message_data.get('call', {})
+        customer_data = call_data.get('customer', {}) or message_data.get('customer', {})
+        customer_number = customer_data.get('number')
+        
+        if not customer_number:
+            return {"status": "error", "message": "No customer number provided"}
+        print("Customer number:", customer_number)
+
+        # Get the candidate
+        candidate = await CandidateCRUD.get_candidate_by_phone(customer_number)
+        if not candidate:
+            return {"status": "error", "message": "Candidate not found"}
+        print("Candidate:", candidate)
+
+        # Handle status updates
+        if message_data.get('type') == 'status-update':
+            status = message_data.get('status')
+            ended_reason = message_data.get('endedReason')
+            print("Status, ended reason:", status, ended_reason)
+            
+            # If call was declined/busy/no-answer, try SMS
+            if status == 'ended' and ended_reason in ['customer-busy', 'no-answer', 'declined']:
+                print(f"Call ended with reason: {ended_reason}. Trying SMS...")
+                sms_status = await interview_bot.try_sms(candidate)
+                if sms_status.get("success"):
+                    candidate.communication_method = "sms"
+                    await candidate.save()
+                    print("Successfully switched to SMS")
+                else:
+                    print("SMS fallback failed:", sms_status.get("error"))
+
+        # Handle end-of-call report
+        elif message_data.get('type') == 'end-of-call-report':
+            # Get transcript directly from message_data
+            transcript = message_data.get('transcript', '')
+            if transcript:
+                try:
+                    # Parse current answers
+                    try:
+                        current_answers = json.loads(candidate.answers)
+                    except (json.JSONDecodeError, TypeError):
+                        current_answers = []
+                    
+                    # Add full transcript
+                    current_answers.append({
+                        "full_transcript": transcript,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                    
+                    # Update candidate's answers
+                    candidate.answers = json.dumps(current_answers)
+                    candidate.status = "pending"
+                    await candidate.save()
+                    
+                except Exception as e:
+                    print(f"Error saving transcript: {str(e)}")
+
+        return {"status": "success"}
+
+    except Exception as e:
+        print(f"Error processing VAPI webhook: {str(e)}")
+        return {"status": "error", "message": str(e)}

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     ELEVEN_LABS_API_KEY: str
     ELEVEN_LABS_VOICE_ID: str
 
+    VAPI_KEY: str
+    VAPI_VOICE_ID: str
+    VAPI_PHONE_NUMBER_ID: str
+
     RELEVANCE_AI_PROJECT: str
     RELEVANCE_AI_API_KEY: str
     RELEVANCE_AI_AUTH_TOKEN: str

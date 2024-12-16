@@ -7,6 +7,7 @@ from app.database.candidate import CandidateModel, CandidateCRUD
 import asyncio
 import requests
 from typing import List
+from vapi_python import Vapi
 
 class InterviewBot:
     def __init__(self):
@@ -15,6 +16,8 @@ class InterviewBot:
         self.whatsapp_number = constants.TWILIO_WHATSAPP_NUMBER  # WhatsApp-enabled number
         self.questions = self._load_questions()
         self.total_questions = len(self.questions['questions'])
+        # Initialize VAPI
+        self.vapi = Vapi(api_key=constants.VAPI_KEY)
 
     def _load_questions(self) -> Dict:
         """Load interview questions from JSON file"""
@@ -99,25 +102,97 @@ class InterviewBot:
             return False
 
     async def try_voice_call(self, candidate: CandidateModel) -> Dict:
-        """Attempt regular voice call"""
+        """Attempt regular voice call with VAPI assistant"""
         try:
-            call = self.twilio_client.calls.create(
-                url=f"{constants.BASE_URL}/api/qualification/webhook/voice",
-                to=candidate.phone,
-                from_=self.phone_number,
-                method='GET'
-            )
+            url = "https://api.vapi.ai/call/phone"
+            headers = {
+                "Authorization": constants.VAPI_KEY,
+                "Content-Type": "application/json"
+            }
             
-            # Wait for call status (15 seconds timeout)
-            await asyncio.sleep(15)
-            call = self.twilio_client.calls(call.sid).fetch()
+            payload = {
+                "phoneNumberId": constants.VAPI_PHONE_NUMBER_ID,
+                "customer": {
+                    "number": candidate.phone,
+                    "name": candidate.name
+                },
+                "assistant": {
+                    "name": "Qualification Assistant",
+                    "voice": {
+                        "voiceId": constants.VAPI_VOICE_ID,
+                        "provider": "11labs",
+                        "stability": 0.5,
+                        "similarityBoost": 0.75
+                    },
+                    "model": {
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": """You are a qualification interviewer.
+First ask: "Are you available for a quick interview? The process will take about twenty minutes."
+If user says no or is not available, say "Thank you for your time. Goodbye." and end the call.
+
+Ask these questions in order:
+1. Where are you currently based? (City, Town, Postal Code please)
+2. Are you eligible to work in the UK?
+3. Do you have a current DBS certificate registered on the Update Service?
+4. How many days per week are you available to work?
+   • If less than 3 days, say "Thank you for your time, but we require minimum 3 days availability. Goodbye." and end the call
+5. Are you available to start immediately?
+   • If No, ask "What is your earliest start date?"
+6. Do you have experience working with children in schools or childcare?
+7. Have you previously worked in a supply role?
+   • If Yes, ask "Which agency did you work with?"
+8. Do you have access to your own transport?
+9. How far are you willing to travel for work?
+10. Do you have any restrictions on availability due to other commitments?
+11. What motivates you to work in schools?
+
+After all questions are answered, say "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye." and end the call.
+
+Be professional but friendly. Listen carefully to answers and ask for clarification if needed."""
+                            }
+                        ],
+                        "provider": "openai",
+                        "temperature": 0.7,
+                        "maxTokens": 250,
+                    },
+                    "recordingEnabled": True,
+                    "firstMessage": f"Hello {candidate.name}, I'm calling about your qualification interview. Are you available to talk for about twenty minutes?",
+                    "voicemailMessage": "Sorry we missed you. Please register again when you're available for the interview.",
+                    "endCallMessage": "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye.",
+                    "transcriber": {
+                        "model": "general",
+                        "language": "en",
+                        "provider": "deepgram"
+                    },
+                    "server": {
+                        "url": f"{constants.BASE_URL}/api/qualification/webhook/vapi"
+                    },
+                    "clientMessages": [
+                        "transcript", "hang", "function-call", "speech-update", 
+                        "metadata", "conversation-update"
+                    ],
+                    "serverMessages": [
+                        "end-of-call-report", "status-update", "hang", "function-call", "transcript"
+                    ],
+                    "endCallPhrases": [
+                        "Goodbye.",
+                        "Thank you for your time. Goodbye.",
+                        "Thank you for completing the interview. We will review your answers and get back to you soon. Goodbye."
+                    ],
+                }
+            }
+
+            # Make the call request
+            response = requests.post(url, json=payload, headers=headers)
+            print("VAPI Response:", response)
             
-            print("Call status:", call.status)
-            if call.status in ['completed', 'in-progress']:
+            if response.status_code == 200:
                 return {"success": True}
-            elif call.status in ['no-answer', 'busy', 'failed', 'canceled', 'ringing']:
-                return {"success": False, "error": "no_answer"}
-            return {"success": False}
+            else:
+                return {"success": False, "error": response.text}
             
         except Exception as e:
             print("Voice call error:", str(e))
