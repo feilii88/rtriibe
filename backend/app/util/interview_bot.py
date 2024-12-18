@@ -137,28 +137,31 @@ class InterviewBot:
                         "similarityBoost": 0.75
                     },
                     "model": {
-                        "model": "gpt-4o-mini",
+                        "model": "gpt-4o",
                         "messages": [
                             {
                                 "role": "system",
                                 "content": """You are a qualification interviewer.
-First ask: "Hello, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
+Here, pronounce rtribe as /ɑrˈtraɪb/.
+First ask: "Hello, I'm calling from rtribe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
 If user says no or is not available, say "Thank you for your time. Goodbye." and end the call.
 
-Ask these questions in order:
-1. Are you eligible to work in the UK?
-   • If No, then say "Thank you for your time, but we require UK work eligibility. Goodbye." and end the call
-2. How many days per week are you available to work?
-   • If less than 3 weekdays, say "Thank you for your time, but we require minimum 3 days availability. Goodbye." and end the call
-3. Where do you currently live? (City or Town please)
-   • If not in the UK, say "Thank you for your time, but we only accept candidates based in the UK. Goodbye." and end the call
-4. Have you previously worked in a supply role?
+Ask these questions in order (Do not say the question number):
+Are you eligible to work in the UK?
+   • If No, then say "Thank you for your time, but we require UK work eligibility. Thank you for your interest, goodbye." and end the call
+How many days per week are you available to work?
+   • If less than 3 weekdays, say "Thank you for your time, but we require minimum 3 days availability. Thank you for your interest, goodbye." and end the call
+Where do you currently live? (City or Town please)
+   • If the location is unknown, ask "Could you please clarify your location?"
+   • If not in the UK, say "Thank you for your time, but we only accept candidates based in the UK. Thank you for your interest, goodbye." and end the call
+Have you previously worked in a supply role?
    • If Yes, ask "Which agency did you work with?"
-5. Do you have any restrictions on your availability due to childcare, study, or other commitments?
-6. Do you have a current DBS certificate that is registered on the Update Service?
-
-After all questions are answered, say "Thank you for that. That's all for now, your should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day." and end the call.
-
+Do you have any restrictions on your availability due to childcare, study, or other commitments?
+Do you have a current DBS certificate that is registered on the Update Service?
+   • Accept any answer for this question.
+-----------------------
+After all questions are answered, say "Thank you for that. That's all for now, You should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day." and end the call.
+After saying good bye, end the call and don't say anything else.
 Be professional but friendly. Listen carefully to answers and ask for clarification if needed."""
                             }
                         ],
@@ -167,9 +170,9 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
                         "maxTokens": 250,
                     },
                     "recordingEnabled": True,
-                    "firstMessage": f"Hello {candidate.name}, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?",
+                    "firstMessage": f"Hello {candidate.name}, I'm calling from rtribe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?",
                     "voicemailMessage": "Sorry we missed you. Please register again when you're available for the interview.",
-                    "endCallMessage": "Thank you for that. That's all for now, your should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day.",
+                    "endCallMessage": "Thank you for that. That's all for now, You should receive a link for your application form if you can complete this as soon as possible we will get you cleared and out working. Many thanks and have a good day.",
                     "transcriber": {
                         "model": "general",
                         "language": "en",
@@ -188,7 +191,7 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
                     "endCallPhrases": [
                         "Goodbye.",
                         "Thank you for your time. Goodbye.",
-                        "In the future please get in touch with us again. Many thanks for your interest in rTriibe. Goodbye."
+                        "In the future please get in touch with us again. Many thanks for your interest in rTribe. Goodbye."
                     ],
                 }
             }
@@ -263,7 +266,7 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
         """Attempt SMS interview"""
         try:
             # Send initial message
-            welcome_msg = f"Hi {candidate.name}, I'm calling from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
+            welcome_msg = f"Hi {candidate.name}, I'm from rTriibe. You have sent your details to us for school based work so I just wanted to run through some initial questions if that's ok?"
             
             message = self.twilio_client.messages.create(
                 from_=self.phone_number,
@@ -540,7 +543,7 @@ Be professional but friendly. Listen carefully to answers and ask for clarificat
             if candidate.current_question >= len(self.questions['questions']):
                 candidate.status = "pending"
                 await candidate.save()
-                return ("Thank you for that. That's all for now, your should receive a link for your application form "
+                return ("Thank you for that. That's all for now, You should receive a link for your application form "
                        "if you can complete this as soon as possible we will get you cleared and out working. "
                        "Many thanks and have a good day.")
 

@@ -17,10 +17,15 @@ voice_generator = VoiceGenerator()
 async def register_candidate(candidate_data: CandidateCreate):
     """Register a new candidate and start qualification process"""
     try:
-        # Check if candidate already exists
+        # Check if candidate already exists by email
         existing_candidate = await CandidateCRUD.get_candidate_by_email(candidate_data.email)
         if existing_candidate:
-            raise HTTPException(status_code=400, detail="Candidate already registered")
+            raise HTTPException(status_code=400, detail="Candidate already registered with this email")
+
+        # Check if candidate already exists by phone number
+        existing_candidate = await CandidateCRUD.get_candidate_by_phone(candidate_data.phone)
+        if existing_candidate:
+            raise HTTPException(status_code=400, detail="Candidate already registered with this phone number")
 
         print("Creating candidate")
         # Create candidate
@@ -282,7 +287,7 @@ async def vapi_webhook(request: Request):
             print("Status, ended reason:", status, ended_reason)
             
             # If call was declined/busy/no-answer, try SMS
-            if status == 'ended' and ended_reason in ['customer-busy', 'no-answer', 'declined']:
+            if status == 'ended' and ended_reason in ['customer-busy', 'no-answer', 'declined', 'voicemail', 'customer-did-not-answer', 'assistant-said-end-call-phrase']:
                 print(f"Call ended with reason: {ended_reason}. Trying SMS...")
                 sms_status = await interview_bot.try_sms(candidate)
                 if sms_status.get("success"):

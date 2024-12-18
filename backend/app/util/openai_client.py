@@ -95,19 +95,19 @@ Return exactly in this json format:
         Returns: (should_end, end_message)
         """
         if question_id == 1 and normalized_answer.lower() != 'yes':
-            return True, "Thank you for your time, but we require UK work eligibility. Goodbye."
+            return True, "Thank you for your time, but we require UK work eligibility. Thank you for your interest. Goodbye."
             
         elif question_id == 2:
             try:
                 days = int(normalized_answer)
                 if days < 3:
-                    return True, "Thank you for your time, but we require minimum 3 days availability. Goodbye."
+                    return True, "Thank you for your time, but we require minimum 3 days availability. Thank you for your interest. Goodbye."
             except ValueError:
-                return True, "Thank you for your time, but we require clear availability information. Goodbye."
+                return True, "Thank you for your time, but we require clear availability information. Thank you for your interest. Goodbye."
                 
         elif question_id == 3:
             if not self._is_uk_location(normalized_answer):
-                return True, "Thank you for your time, but we only accept candidates based in the UK. Goodbye."
+                return True, "Thank you for your time, but we only accept candidates based in the UK. Thank you for your interest. Goodbye."
         
         return False, ""
 

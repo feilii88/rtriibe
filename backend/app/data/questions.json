@@ -2,7 +2,7 @@
   "questions": [
     {
       "id": 1,
-      "text": "Are you eligible to work in the UK? (Yes/No)",
+      "text": "Are you eligible to work in the UK? (Please respond with Yes or No)",
       "type": "boolean",
       "options": ["Yes", "No"]
     },
@@ -18,7 +18,7 @@
     },
     {
       "id": 4,
-      "text": "Have you previously worked in a supply role? (Yes/No)",
+      "text": "Have you previously worked in a supply role? (Please respond with Yes or No)",
       "type": "boolean",
       "options": ["Yes", "No"],
       "follow_up": {
@@ -30,13 +30,13 @@
     },
     {
       "id": 5,
-      "text": "Do you have any restrictions on your availability due to childcare, study, or other commitments? (Yes/No)",
+      "text": "Do you have any restrictions on your availability due to childcare, study, or other commitments? (Please respond with Yes or No)",
       "type": "boolean",
       "options": ["Yes", "No"]
     },
     {
       "id": 6,
-      "text": "Do you have a current DBS certificate that is registered on the Update Service? (Yes/No)",
+      "text": "Do you have a current DBS certificate that is registered on the Update Service? (Please respond with Yes or No)",
       "type": "boolean",
       "options": ["Yes", "No"]
     }
